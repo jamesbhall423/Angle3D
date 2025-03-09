@@ -452,6 +452,42 @@ public class Test<T extends Angle3D<T>, S extends Angle3DSystem<T>> {
         if (Math.abs(massInertia.zx()-solidInertia.zx())>0.002) throw new RuntimeException(massInertia.zx()+" "+solidInertia.zx());
         if (Math.abs(massInertia.yz()-solidInertia.yz())>0.002) throw new RuntimeException(massInertia.yz()+" "+solidInertia.yz());
     }
+    public void testTrueKE() {
+        List<PointMass> massOriginal = new ArrayList<>();
+        massOriginal.add(new PointMass(1.1, new Vector3D(0.8,0.2,0)));
+        massOriginal.add(new PointMass(0.8, new Vector3D(-0.6,-0.5,0)));
+        massOriginal.add(new PointMass(3.6, new Vector3D(0.8,0.4,1)));
+        massOriginal.add(new PointMass(2.4, new Vector3D(2.2,0,-1)));
+        massOriginal.add(new PointMass(1.3, new Vector3D(0,0.8,-0.5)));
+        SquareInertia inertia = SquareInertia.getAbsolute(massOriginal);
+        RotatableBody<T> body = MomentCalculator.getRotatableBody(system, inertia);
+        body.setRotationalMomentum(new Vector3D(1.43724, -0.8226, 0.3115));
+        double timeGap = 0.0001;
+        double rejectionThreshold = 0.001;
+        double totalTime = 1;
+        List<PointMass> massOld = massOriginal;
+        List<PointMass> massNew;
+        T oldAngle = null;
+        for (double time = 0; time < totalTime; time+=timeGap) {
+            double reportedKE = body.rotationalEnergy();
+            body.rotateForTime(timeGap);
+            T angle = body.getAngle();
+            massNew = massOriginal.stream().map((PointMass m) -> new PointMass(m.mass,angle.rotate(m.position))).collect(Collectors.toList());
+            double trueKE = 0.0;
+            for (int i = 0; i < massOriginal.size(); i++) {
+                trueKE += 0.5 * massOriginal.get(i).mass*massOld.get(i).position.difference(massNew.get(i).position).sqMagnitude()/(timeGap*timeGap);
+            }
+            massOld=massNew;
+            if (Math.abs(trueKE-reportedKE)>rejectionThreshold) {
+                System.out.println(trueKE);
+                System.out.println(reportedKE);
+                System.out.println(oldAngle);
+                System.out.println(angle);
+                throw new RuntimeException();
+            }
+            oldAngle=angle;
+        }
+    }
     public static void main(String[] args) {
         Test<?,?> test = new Test<>(QuaternionSystem.INSTANCE);
         test.testXY();
@@ -479,6 +515,7 @@ public class Test<T extends Angle3D<T>, S extends Angle3DSystem<T>> {
         test.testTorquePrecision();
         test.testSolids();
         test.testTorqueMagnitude();
+        test.testTrueKE();
 
         System.out.println("Test completed");
     }
