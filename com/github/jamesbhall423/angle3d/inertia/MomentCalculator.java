@@ -85,7 +85,6 @@ public class MomentCalculator {
                 frac /= 2;
             }
         }
-        System.out.println("Final tester rotation: " + tester.rotation);
         return tester.rotation;
     }
 
